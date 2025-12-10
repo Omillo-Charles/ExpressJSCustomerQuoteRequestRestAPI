@@ -33,11 +33,7 @@ const config = {
 
     // Database configuration
     database: {
-        mongoUri: process.env.MONGODB_URI,
-        options: {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        }
+        mongoUri: process.env.MONGODB_URI
     },
 
     // Email/SMTP configuration
