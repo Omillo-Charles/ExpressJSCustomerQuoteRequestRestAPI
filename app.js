@@ -4,6 +4,7 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import createError from 'http-errors';
 import config from './config/env.js';
+import { initializeDB, checkDatabaseHealth } from './database/mongodb.js';
 
 const app = express();
 const PORT = config.server.port;
@@ -29,11 +30,17 @@ app.get('/', (req, res) => {
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+    const dbHealth = await checkDatabaseHealth();
+
     res.json({
-        status: 'healthy',
+        status: dbHealth ? 'healthy' : 'unhealthy',
         timestamp: new Date().toISOString(),
-        environment: config.server.nodeEnv
+        environment: config.server.nodeEnv,
+        database: {
+            connected: dbHealth,
+            status: dbHealth ? 'connected' : 'disconnected'
+        }
     });
 });
 
@@ -55,10 +62,26 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📝 Environment: ${config.server.nodeEnv}`);
-    console.log(`🌐 CORS Origin: ${config.server.corsOrigin}`);
-});
+// Initialize database and start server
+const startServer = async () => {
+    try {
+        // Initialize database connection
+        await initializeDB();
+
+        // Start the server
+        app.listen(PORT, () => {
+            console.log(`🚀 Server running on port ${PORT}`);
+            console.log(`📝 Environment: ${config.server.nodeEnv}`);
+            console.log(`🌐 CORS Origin: ${config.server.corsOrigin}`);
+            console.log(`💾 Database: Connected`);
+        });
+    } catch (error) {
+        console.error('❌ Failed to start server:', error.message);
+        process.exit(1);
+    }
+};
+
+// Start the application
+startServer();
 
 export default app;
