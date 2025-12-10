@@ -396,8 +396,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For support and inquiries:
 
 - **Email**: omytechkenya@gmail.com
-- **Website**: [omytech.vercel.app](https://omytech.vercel.app)
-- **GitHub**: [github.com/omytech](https://github.com/omytech)
+- **Website**: [omytech.co.ke](https://omytech.vercel.app)
+- **GitHub**: [github.com/omytech-kenya](https://github.com/omytech)
 
 ## Acknowledgments
 
