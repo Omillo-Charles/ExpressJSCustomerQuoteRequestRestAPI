@@ -44,23 +44,24 @@ app.get('/health', async (req, res) => {
     });
 });
 
-// Import routes (will be created)
-// import quoteRoutes from './routes/quotes.js';
-// app.use('/api/quotes', quoteRoutes);
+// Import routes
+import apiRoutes from './routes/index.js';
+import { globalErrorHandler, notFound } from './middleware/errorHandler.js';
+import { securityHeaders, sanitizeInput, requestLogger } from './middleware/security.js';
+
+// Security middleware
+app.use(securityHeaders);
+app.use(sanitizeInput);
+app.use(requestLogger);
+
+// API routes
+app.use('/api', apiRoutes);
 
 // 404 handler
-app.use((req, res, next) => {
-    next(createError(404));
-});
+app.use(notFound);
 
-// Error handler
-app.use((err, req, res, next) => {
-    res.status(err.status || 500);
-    res.json({
-        message: err.message,
-        error: config.app.isDevelopment ? err : {}
-    });
-});
+// Global error handler
+app.use(globalErrorHandler);
 
 // Initialize database and start server
 const startServer = async () => {
