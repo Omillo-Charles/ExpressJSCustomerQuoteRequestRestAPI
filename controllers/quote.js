@@ -1,6 +1,7 @@
 import Quote from '../models/quote.js';
 import config from '../config/env.js';
 import { sendQuoteNotificationEmail, sendQuoteResponseEmail, sendStatusUpdateEmail } from '../utils/nodemailer.js';
+import { calculateEstimatedPrice, getServiceByName } from '../constants/services.js';
 
 /**
  * Get all quote requests with pagination and filtering
@@ -118,19 +119,48 @@ export const createQuote = async (req, res) => {
         const quote = new Quote(quoteData);
         const savedQuote = await quote.save();
 
-        // Send email notification to admin
+        // Automatically calculate and add quote based on service
         try {
-            await sendQuoteNotificationEmail(savedQuote);
+            const complexity = determineComplexity(quoteData);
+            const addons = determineAddons(quoteData);
+            const priceCalculation = calculateEstimatedPrice(
+                quoteData.service,
+                complexity,
+                quoteData.currency || 'KES',
+                addons
+            );
+
+            // Add the calculated quote to the saved quote
+            const quotedQuote = await savedQuote.addQuote(priceCalculation.totalPrice, quoteData.currency || 'KES');
+
+            // Send quote response email to customer immediately
+            await sendQuoteResponseEmail(quotedQuote, priceCalculation);
+
+            // Send notification email to admin
+            await sendQuoteNotificationEmail(quotedQuote);
+
+            res.status(201).json({
+                success: true,
+                message: 'Quote request submitted and quote sent successfully',
+                data: {
+                    quote: quotedQuote,
+                    priceBreakdown: priceCalculation
+                }
+            });
+
         } catch (emailError) {
-            console.error('Failed to send notification email:', emailError.message);
-            // Don't fail the request if email fails
+            console.error('Failed to send emails:', emailError.message);
+
+            // Still return success but note email issue
+            res.status(201).json({
+                success: true,
+                message: 'Quote request submitted successfully, but there was an issue sending the quote email',
+                data: savedQuote,
+                warning: 'Quote email delivery failed'
+            });
         }
 
-        res.status(201).json({
-            success: true,
-            message: 'Quote request submitted successfully',
-            data: savedQuote
-        });
+
 
     } catch (error) {
         console.error('Error creating quote:', error.message);
@@ -435,4 +465,90 @@ export const getQuoteStats = async (req, res) => {
             error: config.app.isDevelopment ? error.message : 'Internal server error'
         });
     }
+};
+
+/**
+ * Determine project complexity based on quote data
+ * @param {Object} quoteData - Quote request data
+ * @returns {string} Complexity level (basic, intermediate, advanced)
+ */
+const determineComplexity = (quoteData) => {
+    let complexityScore = 0;
+
+    // Budget-based complexity
+    const budget = parseFloat(quoteData.budget);
+    const currency = quoteData.currency || 'KES';
+    const service = getServiceByName(quoteData.service);
+
+    if (service) {
+        const basePrice = service.basePrice[currency];
+        const budgetRatio = budget / basePrice;
+
+        if (budgetRatio >= 3) complexityScore += 2;
+        else if (budgetRatio >= 1.5) complexityScore += 1;
+    }
+
+    // Timeline-based complexity
+    if (quoteData.timeline === '6+ months') complexityScore += 2;
+    else if (quoteData.timeline === '3-6 months') complexityScore += 1;
+    else if (quoteData.timeline === '1-2 weeks') complexityScore -= 1;
+
+    // Service-specific complexity indicators
+    if (quoteData.service === 'Web Development' || quoteData.service === 'Mobile App Design') {
+        if (quoteData.features && quoteData.features.length >= 4) complexityScore += 2;
+        else if (quoteData.features && quoteData.features.length >= 2) complexityScore += 1;
+
+        if (quoteData.features && quoteData.features.includes('Authentication')) complexityScore += 1;
+        if (quoteData.features && quoteData.features.includes('API')) complexityScore += 1;
+    }
+
+    if (quoteData.service === 'UI/UX Design') {
+        if (quoteData.designType && quoteData.designType.length >= 3) complexityScore += 2;
+        else if (quoteData.designType && quoteData.designType.length >= 2) complexityScore += 1;
+
+        if (quoteData.platforms && quoteData.platforms.length >= 3) complexityScore += 1;
+    }
+
+    if (quoteData.service === 'Digital Marketing') {
+        if (quoteData.marketingChannels && quoteData.marketingChannels.length >= 4) complexityScore += 2;
+        else if (quoteData.marketingChannels && quoteData.marketingChannels.length >= 2) complexityScore += 1;
+
+        if (quoteData.campaignDuration === '12 Months' || quoteData.campaignDuration === 'Ongoing') {
+            complexityScore += 1;
+        }
+    }
+
+    // Description length as complexity indicator
+    if (quoteData.description && quoteData.description.length > 500) complexityScore += 1;
+
+    // Determine final complexity
+    if (complexityScore >= 4) return 'advanced';
+    if (complexityScore >= 2) return 'intermediate';
+    return 'basic';
+};
+
+/**
+ * Determine required addons based on quote data
+ * @param {Object} quoteData - Quote request data
+ * @returns {Array} Array of addon names
+ */
+const determineAddons = (quoteData) => {
+    const addons = [];
+
+    // Web Development and Mobile App specific addons
+    if (quoteData.service === 'Web Development' || quoteData.service === 'Mobile App Design') {
+        if (quoteData.hosting === 'Yes') {
+            addons.push('hosting');
+        }
+
+        if (quoteData.domain === 'Yes') {
+            addons.push('domain');
+        }
+
+        if (quoteData.maintenance && quoteData.maintenance !== 'None') {
+            addons.push('maintenance');
+        }
+    }
+
+    return addons;
 };

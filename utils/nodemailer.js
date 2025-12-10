@@ -209,7 +209,18 @@ const generateQuoteResponseTemplate = (quote) => {
                 
                 <div class="quote-amount">
                     <h2>Quote Amount: ${quote.quotedCurrency} ${quote.quotedAmount.toLocaleString()}</h2>
+                    ${priceBreakdown ? `<p><small>Complexity Level: ${priceBreakdown.complexity}</small></p>` : ''}
                 </div>
+                
+                ${priceBreakdown && priceBreakdown.addons && priceBreakdown.addons.length > 0 ? `
+                <div class="quote-details">
+                    <h3>Included Services</h3>
+                    <div class="value"><span class="label">Base Service:</span> ${quote.quotedCurrency} ${priceBreakdown.servicePrice.toLocaleString()}</div>
+                    ${priceBreakdown.addons.map(addon =>
+        `<div class="value"><span class="label">${addon.name}:</span> ${addon.currency} ${addon.price.toLocaleString()}</div>`
+    ).join('')}
+                </div>
+                ` : ''}
                 
                 <div class="quote-details">
                     <h3>Project Summary</h3>
@@ -286,9 +297,10 @@ export const sendQuoteNotificationEmail = async (quote) => {
 /**
  * Send quote response to customer
  * @param {Object} quote - Quote data with quoted amount
+ * @param {Object} priceBreakdown - Optional price breakdown details
  * @returns {Promise<Object>}
  */
-export const sendQuoteResponseEmail = async (quote) => {
+export const sendQuoteResponseEmail = async (quote, priceBreakdown = null) => {
     const mailOptions = {
         from: config.email.from,
         to: quote.email,
