@@ -1,5 +1,6 @@
 import Quote from '../models/quote.js';
 import config from '../config/env.js';
+import { sendQuoteNotificationEmail, sendQuoteResponseEmail, sendStatusUpdateEmail } from '../utils/nodemailer.js';
 
 /**
  * Get all quote requests with pagination and filtering
@@ -117,8 +118,13 @@ export const createQuote = async (req, res) => {
         const quote = new Quote(quoteData);
         const savedQuote = await quote.save();
 
-        // TODO: Send email notification
-        // await sendQuoteNotificationEmail(savedQuote);
+        // Send email notification to admin
+        try {
+            await sendQuoteNotificationEmail(savedQuote);
+        } catch (emailError) {
+            console.error('Failed to send notification email:', emailError.message);
+            // Don't fail the request if email fails
+        }
 
         res.status(201).json({
             success: true,
@@ -174,8 +180,19 @@ export const updateQuoteStatus = async (req, res) => {
             });
         }
 
+        // Store old status for email notification
+        const oldStatus = quote.status;
+
         // Update status using model method
         const updatedQuote = await quote.updateStatus(status, notes);
+
+        // Send status update email to customer
+        try {
+            await sendStatusUpdateEmail(updatedQuote, oldStatus);
+        } catch (emailError) {
+            console.error('Failed to send status update email:', emailError.message);
+            // Don't fail the request if email fails
+        }
 
         res.status(200).json({
             success: true,
@@ -231,8 +248,13 @@ export const addQuoteAmount = async (req, res) => {
         // Add quote using model method
         const updatedQuote = await quote.addQuote(amount, currency);
 
-        // TODO: Send quote email to customer
-        // await sendQuoteEmail(updatedQuote);
+        // Send quote response email to customer
+        try {
+            await sendQuoteResponseEmail(updatedQuote);
+        } catch (emailError) {
+            console.error('Failed to send quote response email:', emailError.message);
+            // Don't fail the request if email fails
+        }
 
         res.status(200).json({
             success: true,
