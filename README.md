@@ -1,4 +1,4 @@
-# OmyTech Quote Request API
+# OMYTECH Quote Request API
 
 A professional REST API for automated quote generation and management, built with Node.js, Express, and MongoDB. This API automatically calculates and delivers quotes for various digital services including web development, mobile apps, UI/UX design, e-commerce, digital marketing, and consulting.
 
